@@ -1,10 +1,16 @@
+import struct
+
 import numpy as np
 import igor2.binarywave as bw
 
 
 def parse_ibw(path):
     """Load an IBW file and return a dict with data and metadata."""
-    raw = bw.load(path)
+    try:
+        raw = bw.load(path)
+    except (ValueError, struct.error) as exc:
+        raise ValueError(f"Cannot read '{path}' as an IBW file: {exc}") from exc
+
     wave = raw["wave"]
     header = wave["wave_header"]
 
@@ -13,6 +19,12 @@ def parse_ibw(path):
     note_bytes = wave.get("note", b"")
     note_str = note_bytes.decode("latin-1") if isinstance(note_bytes, bytes) else note_bytes
     metadata = _parse_note(note_str)
+
+    if "ScanSize" not in metadata:
+        raise ValueError(
+            f"Wave note in '{path}' is missing required key 'ScanSize'. "
+            "The file may be incomplete or from an unsupported instrument."
+        )
 
     data_units_raw = header.get("dataUnits", [b""])
     if isinstance(data_units_raw, (list, np.ndarray)):
